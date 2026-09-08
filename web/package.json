@@ -1,0 +1,31 @@
+{
+  "name": "stoa-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Стоя | Stoa — стоический ежедневник: планировщик, дневник, гид практик, задачи",
+  "engines": { "node": ">=18.18" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "next": "^15.3.0",
+    "next-intl": "^4.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}

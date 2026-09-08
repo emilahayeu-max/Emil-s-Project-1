@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   «Стоя» — дизайн-токены (docs/06-ui-design.md)
+   Светлая тема «Мрамор», тёмная — «Тушь».
+   Значения — RGB-триплеты для opacity-модификаторов Tailwind.
+   ============================================================ */
+
+:root {
+  --bg: 245 242 234;         /* #F5F2EA папирус */
+  --surface: 255 255 255;    /* #FFFFFF */
+  --surface2: 237 232 220;   /* #EDE8DC */
+  --ink: 31 36 42;           /* #1F242A */
+  --soft: 91 100 112;        /* #5B6470 */
+  --line: 226 220 206;       /* #E2DCCE */
+  --accent: 169 126 79;      /* #A97E4F бронза */
+  --accent-ink: 255 255 255;
+  --sage: 94 122 94;         /* #5E7A5E шалфей */
+  --sageBg: 233 239 230;
+  --clay: 176 102 78;        /* #B0664E терракота */
+  --clayBg: 245 233 227;
+
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+[data-theme="dark"] {
+  --bg: 20 22 26;            /* #14161A тушь */
+  --surface: 30 33 38;       /* #1E2126 */
+  --surface2: 38 42 49;      /* #262A31 */
+  --ink: 233 228 216;        /* #E9E4D8 */
+  --soft: 154 163 174;       /* #9AA3AE */
+  --line: 51 56 63;          /* #33383F */
+  --accent: 200 155 99;      /* #C89B63 */
+  --accent-ink: 20 22 26;
+  --sage: 134 163 134;       /* #86A386 */
+  --sageBg: 35 43 36;
+  --clay: 201 128 102;       /* #C98066 */
+  --clayBg: 46 36 32;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-bg text-ink font-sans antialiased;
+  transition: background-color .25s ease, color .25s ease;
+}
+
+::selection {
+  background: rgb(var(--accent) / 0.25);
+}
+
+/* Мягкий скроллбар для списков */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line)) transparent;
+}
+
+/* Тап-таргеты и фокус */
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 3px solid rgb(var(--accent) / 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
