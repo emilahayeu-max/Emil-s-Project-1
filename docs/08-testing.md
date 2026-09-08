@@ -40,7 +40,7 @@ flowchart TD
 
 ## 4. E2E-сценарии (Playwright)
 
-**Реализовано:** `web/e2e/critical-path.spec.ts` — E2E-01, E2E-04, E2E-05, E2E-06; конфиг `web/playwright.config.ts` (desktop + mobile-проекты). Запуск: `npm run test:e2e`. В песочнице без браузеров прогон недоступен, поэтому тесты исполняются автоматически в **CI (GitHub Actions, `.github/workflows/ci.yml`)**: юнит → сборка → E2E на каждом push/PR.
+**Реализовано:** `web/e2e/critical-path.spec.ts` — E2E-01, E2E-04, E2E-05, E2E-06; конфиг `web/playwright.config.ts` (desktop + mobile-проекты). Запуск: `npm run test:e2e` (нужен `npx playwright install chromium`). В песочнице без браузеров прогон недоступен, поэтому тесты исполняются автоматически в **CI (GitHub Actions)**: готовый workflow лежит в `docs/ci/github-actions-ci.yml.example` — скопируйте его в `.github/workflows/ci.yml` (пуш аккаунтом с правом `workflows`). Пайплайн: юнит → сборка → E2E.
 
 | ID | Сценарий | Шаги (кратко) | Критерий успеха |
 |---|---|---|---|

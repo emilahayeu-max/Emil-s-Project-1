@@ -63,7 +63,7 @@ npm run build      # производственная сборка
 Демо-режим: аккаунт хранится локально в браузере (LocalAdapter, `web/src/lib/store.tsx`).
 Боевой режим: задайте `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY` (см. `web/.env.example`) и примените миграции из `supabase/migrations/` — инструкция в [supabase/README.md](supabase/README.md) и [docs/07-backend.md](docs/07-backend.md).
 
-CI: [.github/workflows/ci.yml](.github/workflows/ci.yml) — юнит-тесты → сборка → E2E на каждом push и PR.
+CI: готовый workflow — [docs/ci/github-actions-ci.yml.example](docs/ci/github-actions-ci.yml.example). Чтобы включить: скопируйте его в `.github/workflows/ci.yml` (нужен пуш аккаунтом с правом `workflows`; GitHub App этой песочницы такого права не имеет — поэтому файл хранится как пример). Пайплайн: юнит-тесты → сборка → E2E на каждом push и PR.
 
 ## Прототип
 
