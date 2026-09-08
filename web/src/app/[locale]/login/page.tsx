@@ -1,10 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useStore } from "@/lib/store";
 import { Button, Card, Field, Input } from "@/components/ui";
+
+/** Самопроверка связи с облаком Supabase (диагностика на экране входа) */
+function CloudCheck() {
+  const t = useTranslations("auth");
+  const [status, setStatus] = useState<"checking" | "ok" | "fail">("checking");
+
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      setStatus("fail");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    fetch(`${url}/rest/v1/`, {
+      headers: { apikey: key },
+      signal: controller.signal,
+    })
+      .then((r) => setStatus(r.ok ? "ok" : "fail"))
+      .catch(() => setStatus("fail"))
+      .finally(() => clearTimeout(timer));
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, []);
+
+  if (status === "checking") {
+    return <p className="mb-4 text-center text-[13px] text-soft">{t("cloudChecking")}</p>;
+  }
+  return (
+    <p
+      className={`mb-4 rounded-md px-3.5 py-2.5 text-center text-[13px] ${
+        status === "ok" ? "bg-sageBg text-sage" : "bg-clayBg text-clay"
+      }`}
+    >
+      {status === "ok" ? t("cloudOk") : t("cloudFail")}
+    </p>
+  );
+}
 
 export default function LoginPage() {
   const t = useTranslations("auth");
@@ -42,7 +83,8 @@ export default function LoginPage() {
         return;
       }
       if (err) {
-        setError(t(err));
+        // Известные ошибки переводим, неизвестные показываем как есть (для диагностики)
+        setError(t.has(err) ? t(err) : err);
         return;
       }
       router.replace(mode === "signup" ? "/onboarding" : "/");
@@ -57,7 +99,9 @@ export default function LoginPage() {
       <div className="mx-auto w-full max-w-sm">
         <div className="mb-1 text-center font-serif text-6xl">🏛</div>
         <h1 className="text-center font-serif text-4xl font-semibold">{t("appName")}</h1>
-        <p className="mb-8 text-center text-sm text-soft">{t("subtitle")}</p>
+        <p className="mb-6 text-center text-sm text-soft">{t("subtitle")}</p>
+
+        {backend === "supabase" && <CloudCheck />}
 
         <Card className="p-6">
           <h2 className="mb-4 font-serif text-2xl font-semibold">
@@ -89,7 +133,11 @@ export default function LoginPage() {
                 required
               />
             </Field>
-            {error && <p className="text-sm text-clay">{error}</p>}
+            {error && (
+              <div className="rounded-md border border-clay bg-clayBg px-3.5 py-2.5 text-sm text-clay">
+                {error}
+              </div>
+            )}
             {notice && (
               <p className="rounded-md bg-sageBg px-3.5 py-2.5 text-sm text-sage">{notice}</p>
             )}

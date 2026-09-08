@@ -110,9 +110,9 @@ export const supabaseAdapter: DataAdapter = {
     const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) {
       console.error("supabase signIn:", error.message);
-      return error.message.toLowerCase().includes("invalid login")
-        ? "auth.errorCredentials"
-        : "auth.errorGeneric";
+      if (/invalid login/i.test(error.message)) return "auth.errorCredentials";
+      if (/email not confirmed/i.test(error.message)) return "auth.errorNotConfirmed";
+      return error.message; // показываем точный текст — для быстрой диагностики
     }
     return null;
   },
@@ -127,9 +127,13 @@ export const supabaseAdapter: DataAdapter = {
     });
     if (error) {
       console.error("supabase signUp:", error.message);
-      return /already registered|already exists/i.test(error.message)
-        ? "auth.errorExists"
-        : "auth.errorGeneric";
+      if (/already registered|already exists|already been registered/i.test(error.message))
+        return "auth.errorExists";
+      if (/rate limit/i.test(error.message)) return "auth.errorRateLimit";
+      if (/signups not allowed/i.test(error.message)) return "auth.errorSignupsDisabled";
+      if (/database error saving new user/i.test(error.message))
+        return "auth.errorDbUser";
+      return error.message; // показываем точный текст — для быстрой диагностики
     }
     // Подтверждение почты включено → сессии нет, ждём письмо
     if (!data.session) return "auth.checkEmail";
