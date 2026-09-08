@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useStore } from "@/lib/store";
 import { quoteAuthor, quoteOfDay, quoteText, randomQuote } from "@/lib/quotes";
+import { isReminderWindow } from "@/lib/reminders";
 import { Button, Card, Badge, SectionLabel, Field } from "@/components/ui";
 
 export default function TodayPage() {
@@ -21,6 +22,14 @@ export default function TodayPage() {
   const dayTasks = state.tasks.filter((x) => x.dueToday);
   const doneCount = dayTasks.filter((x) => x.status === "done").length;
   const externalCount = dayTasks.filter((x) => x.control === "ex" && x.status !== "done").length;
+
+  // Мягкое напоминание (FR-S3): только если ритуал ещё не выполнен и сейчас его время
+  const reminder =
+    part === "morning" && !day.morningDone && isReminderWindow(new Date(), state.settings.morningReminder)
+      ? t("reminderMorningBanner")
+      : part === "evening" && !day.eveningDone && isReminderWindow(new Date(), state.settings.eveningReminder)
+        ? t("reminderEveningBanner")
+        : null;
 
   const flashAnd = (msg: string, fn: () => void) => {
     fn();
@@ -57,6 +66,12 @@ export default function TodayPage() {
           </button>
         ))}
       </div>
+
+      {reminder && (
+        <div className="mt-4 animate-fadeUp rounded-md border border-accent/30 bg-surface px-4 py-3 text-sm font-medium text-accent">
+          ⏰ {reminder}
+        </div>
+      )}
 
       {flash && (
         <div className="mt-4 animate-fadeUp rounded-md bg-sageBg px-4 py-2.5 text-sm font-medium text-sage">

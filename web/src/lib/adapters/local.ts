@@ -90,7 +90,7 @@ export const localAdapter: DataAdapter = {
       entries: st.entries,
       days: st.days,
       favoriteQuoteIds: st.favoriteQuoteIds,
-      theme: st.settings.theme,
+      settings: st.settings,
     };
   },
 
@@ -102,7 +102,7 @@ export const localAdapter: DataAdapter = {
   async addEntry() {},
   async deleteEntry() {},
   async setFavorite() {},
-  async setTheme() {},
+  async setSettings() {},
 
   async deleteAllUserData() {
     if (typeof window !== "undefined") {

@@ -77,7 +77,9 @@
     "saveEvening": "Save review",
     "eveningSaved": "Review saved to journal ✓",
     "eveningDoneSub": "The day is closed. The entry went to your journal.",
-    "skippedNote": "Morning skipped — that is practice too. Start right with the evening."
+    "skippedNote": "Morning skipped — that is practice too. Start right with the evening.",
+    "reminderMorningBanner": "Time for the morning ritual: your intention and main tasks.",
+    "reminderEveningBanner": "Time for the evening review: four questions — and the day is closed."
   },
   "journal": {
     "title": "Journal",
@@ -165,6 +167,8 @@
     "themeSystem": "System",
     "reminders": "Reminders",
     "remindersPh": "soon: Web Push",
+    "reminderMorning": "Morning",
+    "reminderEvening": "Evening",
     "export": "Export data",
     "seedDemo": "Load demo data",
     "seedDone": "Demo data loaded ✓",

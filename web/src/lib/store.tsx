@@ -60,6 +60,7 @@ export interface StoreValue {
   signOut: () => Promise<void>;
   /* настройки */
   setTheme: (theme: Settings["theme"]) => void;
+  setSettings: (patch: Partial<Settings>) => void;
   /* цикл дня */
   updateDay: (patch: Partial<DayLog>) => void;
   finishMorning: () => void;
@@ -111,7 +112,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setState({
           user,
-          settings: { theme: data.theme },
+          settings: data.settings,
           tasks: refreshDue(data.tasks, todayISO()),
           entries: data.entries,
           days: data.days,
@@ -181,7 +182,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const data = await adapter.loadAll();
       setState({
         user,
-        settings: { theme: data.theme },
+        settings: data.settings,
         tasks: refreshDue(data.tasks, todayISO()),
         entries: data.entries,
         days: data.days,
@@ -216,12 +217,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setState(defaultState);
   }, [adapter]);
 
-  const setTheme = useCallback(
-    (theme: Settings["theme"]) => {
-      applyState((s) => ({ ...s, settings: { ...s.settings, theme } }));
-      persist(() => adapter.setTheme(theme));
+  const setSettings = useCallback(
+    (patch: Partial<Settings>) => {
+      const next = { ...stateRef.current.settings, ...patch };
+      applyState((s) => ({ ...s, settings: next }));
+      persist(() => adapter.setSettings(next));
     },
     [adapter, applyState, persist]
+  );
+
+  const setTheme = useCallback(
+    (theme: Settings["theme"]) => setSettings({ theme }),
+    [setSettings]
   );
 
   /* ---------- Цикл дня ---------- */
@@ -460,6 +467,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       signUp,
       signOut,
       setTheme,
+      setSettings,
       updateDay,
       finishMorning,
       saveEvening,
@@ -485,6 +493,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       signUp,
       signOut,
       setTheme,
+      setSettings,
       updateDay,
       finishMorning,
       saveEvening,

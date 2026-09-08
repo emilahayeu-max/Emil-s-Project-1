@@ -1,0 +1,32 @@
+{
+  "name": "Стоя — стоический ежедневник",
+  "short_name": "Стоя",
+  "description": "Стоический ежедневный планировщик, дневник, гид практик и менеджер задач.",
+  "lang": "ru",
+  "start_url": "/ru",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F2EA",
+  "theme_color": "#A97E4F",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

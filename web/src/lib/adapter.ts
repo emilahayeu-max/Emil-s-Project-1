@@ -22,7 +22,7 @@ export interface LoadedData {
   entries: Entry[];
   days: Record<string, DayLog>;
   favoriteQuoteIds: number[];
-  theme: Settings["theme"];
+  settings: Settings;
 }
 
 export interface DataAdapter {
@@ -43,7 +43,7 @@ export interface DataAdapter {
   addEntry(entry: Entry): Promise<void>;
   deleteEntry(id: string): Promise<void>;
   setFavorite(quoteId: number, on: boolean): Promise<void>;
-  setTheme(theme: Settings["theme"]): Promise<void>;
+  setSettings(settings: Settings): Promise<void>;
   deleteAllUserData(): Promise<void>;
 }
 

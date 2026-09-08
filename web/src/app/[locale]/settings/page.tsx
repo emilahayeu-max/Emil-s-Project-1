@@ -15,7 +15,7 @@ export default function SettingsPage() {
   const locale = useLocale() as "ru" | "en";
   const router = useRouter();
   const pathname = usePathname();
-  const { state, setTheme, signOut, exportData, deleteAccount, seedDemo, backend } = useStore();
+  const { state, setTheme, setSettings, signOut, exportData, deleteAccount, seedDemo, backend } = useStore();
 
   const [confirmEmail, setConfirmEmail] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
@@ -95,7 +95,22 @@ export default function SettingsPage() {
           </span>
         </Row>
         <Row label={t("reminders")} icon="⏰">
-          <span className="text-sm text-soft">8:00 · 21:00 ({t("remindersPh")})</span>
+          <div className="flex items-center gap-2 text-sm text-soft">
+            <span>{t("reminderMorning")}</span>
+            <Input
+              type="time"
+              value={state.settings.morningReminder}
+              onChange={(e) => setSettings({ morningReminder: e.target.value })}
+              className="w-28 px-2 py-1.5"
+            />
+            <span>{t("reminderEvening")}</span>
+            <Input
+              type="time"
+              value={state.settings.eveningReminder}
+              onChange={(e) => setSettings({ eveningReminder: e.target.value })}
+              className="w-28 px-2 py-1.5"
+            />
+          </div>
         </Row>
         <Row label={t("export")} icon="⬇️">
           <button onClick={exportData} className="min-h-9 rounded-md px-3 text-sm text-accent hover:bg-surface2">

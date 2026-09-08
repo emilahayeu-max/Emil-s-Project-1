@@ -14,7 +14,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { DataAdapter } from "../adapter";
 import type { DayLog, Entry, Settings, Task } from "../types";
-import { todayISO } from "../types";
+import { defaultSettings, todayISO } from "../types";
 
 /* ---------- Клиент ---------- */
 
@@ -155,7 +155,7 @@ export const supabaseAdapter: DataAdapter = {
       sb.from("journal_entries").select("*").order("created_at", { ascending: false }),
       sb.from("day_logs").select("*"),
       sb.from("favorite_quotes").select("quote_id"),
-      sb.from("profiles").select("theme").eq("id", uid).maybeSingle(),
+      sb.from("profiles").select("theme, morning_reminder, evening_reminder").eq("id", uid).maybeSingle(),
     ]);
     if (t.error) throw t.error;
     if (e.error) throw e.error;
@@ -166,12 +166,17 @@ export const supabaseAdapter: DataAdapter = {
     for (const row of d.data ?? []) {
       days[(row.day as string)] = mapDayLog(row);
     }
+    const defaults = defaultSettings();
     return {
       tasks: (t.data ?? []).map((r) => mapTask(r as Record<string, unknown>)),
       entries: (e.data ?? []).map((r) => mapEntry(r as Record<string, unknown>)),
       days,
       favoriteQuoteIds: (f.data ?? []).map((r) => r.quote_id as number),
-      theme: ((p.data?.theme as string | undefined) ?? "light") as Settings["theme"],
+      settings: {
+        theme: ((p.data?.theme as string | undefined) ?? defaults.theme) as Settings["theme"],
+        morningReminder: (p.data?.morning_reminder as string | undefined) ?? defaults.morningReminder,
+        eveningReminder: (p.data?.evening_reminder as string | undefined) ?? defaults.eveningReminder,
+      },
     };
   },
 
@@ -283,11 +288,18 @@ export const supabaseAdapter: DataAdapter = {
     }
   },
 
-  async setTheme(theme) {
+  async setSettings(settings) {
     const sb = getClient();
     if (!sb) return;
     const uid = await requireUid(sb);
-    const { error } = await sb.from("profiles").update({ theme }).eq("id", uid);
+    const { error } = await sb
+      .from("profiles")
+      .update({
+        theme: settings.theme,
+        morning_reminder: settings.morningReminder,
+        evening_reminder: settings.eveningReminder,
+      })
+      .eq("id", uid);
     if (error) throw error;
   },
 

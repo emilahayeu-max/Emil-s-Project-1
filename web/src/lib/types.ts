@@ -51,6 +51,9 @@ export interface DayLog {
 
 export interface Settings {
   theme: ThemePref;
+  /** Время напоминания "HH:MM" (FR-S3) */
+  morningReminder: string;
+  eveningReminder: string;
 }
 
 export interface User {
@@ -78,9 +81,15 @@ export const defaultDayLog = (): DayLog => ({
   q4: "",
 });
 
+export const defaultSettings = (): Settings => ({
+  theme: "light",
+  morningReminder: "08:00",
+  eveningReminder: "21:00",
+});
+
 export const defaultState: AppState = {
   user: null,
-  settings: { theme: "light" },
+  settings: defaultSettings(),
   tasks: [],
   entries: [],
   days: {},
