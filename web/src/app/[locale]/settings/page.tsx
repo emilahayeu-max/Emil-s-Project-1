@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { useStore } from "@/lib/store";
 import { computeStreak } from "@/lib/streak";
 import { getQuoteById, quoteAuthor, quoteText } from "@/lib/quotes";
 import { todayISO } from "@/lib/types";
-import { Card, Select } from "@/components/ui";
+import { Button, Card, Input, Select } from "@/components/ui";
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
@@ -14,7 +15,16 @@ export default function SettingsPage() {
   const locale = useLocale() as "ru" | "en";
   const router = useRouter();
   const pathname = usePathname();
-  const { state, setTheme, signOut, exportData, resetData } = useStore();
+  const { state, setTheme, signOut, exportData, deleteAccount, seedDemo } = useStore();
+
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [flash, setFlash] = useState<string | null>(null);
+
+  const flashAnd = (msg: string, fn: () => void) => {
+    fn();
+    setFlash(msg);
+    setTimeout(() => setFlash(null), 2200);
+  };
 
   const activeDays = new Set(
     Object.entries(state.days)
@@ -39,10 +49,17 @@ export default function SettingsPage() {
   };
 
   const favorites = state.favoriteQuoteIds.map(getQuoteById).filter(Boolean);
+  const emailMatches = confirmEmail.trim().toLowerCase() === state.user?.email?.toLowerCase();
 
   return (
     <div>
       <h1 className="font-serif text-3xl font-semibold">{t("title")}</h1>
+
+      {flash && (
+        <div className="mt-4 animate-fadeUp rounded-md bg-sageBg px-4 py-2.5 text-sm font-medium text-sage">
+          {flash}
+        </div>
+      )}
 
       {/* Прогресс: мягкий стрик, без наказаний */}
       <Card className="mt-5 py-8 text-center">
@@ -80,24 +97,57 @@ export default function SettingsPage() {
             JSON →
           </button>
         </Row>
-        <Row label={t("signOut")} icon="👤">
+        <Row label={t("seedDemo")} icon="🌱">
           <button
-            onClick={signOut}
-            className="min-h-9 rounded-md px-3 text-sm text-clay hover:bg-clayBg"
+            onClick={() => flashAnd(t("seedDone"), seedDemo)}
+            className="min-h-9 rounded-md px-3 text-sm text-accent hover:bg-surface2"
           >
+            {t("seedDemo")}
+          </button>
+        </Row>
+        <Row label={t("signOut")} icon="👤">
+          <button onClick={signOut} className="min-h-9 rounded-md px-3 text-sm text-clay hover:bg-clayBg">
             {ta("signOut")}
           </button>
         </Row>
-        <Row label={t("reset")} icon="🗑">
-          <button
-            onClick={() => {
-              if (confirm(t("resetConfirm"))) resetData();
-            }}
-            className="min-h-9 rounded-md px-3 text-sm text-clay hover:bg-clayBg"
+      </Card>
+
+      {/* Удаление аккаунта (UC-10 / US-35): подтверждение email */}
+      <Card className="mt-4 border-l-4 border-l-clay">
+        <div className="flex items-center gap-3">
+          <span className="w-7 text-center text-lg">🗑</span>
+          <div>
+            <div className="text-[15px] font-semibold">{t("deleteAccount")}</div>
+            <p className="mt-0.5 text-sm text-soft">{t("deleteHint")}</p>
+          </div>
+        </div>
+        <form
+          className="mt-3 flex flex-wrap items-center gap-2.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (emailMatches && confirm(t("deleteConfirm"))) {
+              deleteAccount();
+              router.replace("/login");
+              router.refresh();
+            }
+          }}
+        >
+          <Input
+            type="email"
+            value={confirmEmail}
+            onChange={(e) => setConfirmEmail(e.target.value)}
+            placeholder={state.user?.email ?? "you@example.com"}
+            className="min-w-40 flex-1"
+          />
+          <Button
+            type="submit"
+            variant="danger"
+            className="border border-clay bg-transparent"
+            disabled={!emailMatches}
           >
-            {t("reset")}
-          </button>
-        </Row>
+            {t("deleteBtn")}
+          </Button>
+        </form>
       </Card>
 
       {/* Избранные цитаты */}

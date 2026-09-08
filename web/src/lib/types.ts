@@ -7,6 +7,8 @@ export type Priority = "P1" | "P2" | "P3";
 /** Дихотомия контроля: in — в моей власти, ex — вне моей власти */
 export type Control = "in" | "ex";
 export type EntryType = "morning" | "evening" | "free" | "practice";
+/** Правило повтора задачи (FR-K4) */
+export type Recur = "none" | "daily" | "weekly";
 
 export interface Task {
   id: string;
@@ -16,7 +18,11 @@ export interface Task {
   control: Control;
   /** Как отвечу — для задач «вне моей власти» */
   reaction?: string;
+  /** Кэш-флаг «на сегодня» (пересчитывается из dueDate при загрузке) */
   dueToday: boolean;
+  /** Дата срока YYYY-MM-DD (FR-K1, опционально) */
+  dueDate?: string;
+  recur: Recur;
   status: TaskStatus;
   createdAt: string; // ISO
 }

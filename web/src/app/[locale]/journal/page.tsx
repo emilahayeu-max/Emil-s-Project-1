@@ -2,8 +2,9 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card, Input } from "@/components/ui";
 
 const MOODS = ["😞", "😐", "🙂", "😄", "🤩"];
 
@@ -18,6 +19,16 @@ export default function JournalPage() {
   const t = useTranslations("journal");
   const locale = useLocale();
   const { state, deleteEntry } = useStore();
+  const [query, setQuery] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const entries = q
+    ? state.entries.filter(
+        (e) =>
+          e.content.toLowerCase().includes(q) ||
+          e.tags.some((tag) => tag.toLowerCase().includes(q))
+      )
+    : state.entries;
 
   const fmtDate = (iso: string) =>
     new Date(iso).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
@@ -37,15 +48,23 @@ export default function JournalPage() {
           ＋ {t("newEntry")}
         </Link>
       </div>
-      <p className="mb-5 mt-2 text-sm text-soft">🔒 {t("privacy")}</p>
+      <p className="mb-4 mt-2 text-sm text-soft">🔒 {t("privacy")}</p>
 
-      {state.entries.length === 0 ? (
+      <Input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t("searchPh")}
+        className="mb-5"
+        type="search"
+      />
+
+      {entries.length === 0 ? (
         <Card>
-          <p className="py-6 text-center text-soft">{t("empty")}</p>
+          <p className="py-6 text-center text-soft">{q ? t("noResults") : t("empty")}</p>
         </Card>
       ) : (
         <div className="space-y-3.5">
-          {state.entries.map((e) => (
+          {entries.map((e) => (
             <Card key={e.id} className="animate-fadeUp group">
               <div className="mb-2 flex items-center gap-2.5">
                 <Badge tone="neutral">{t(TYPE_KEYS[e.type])}</Badge>

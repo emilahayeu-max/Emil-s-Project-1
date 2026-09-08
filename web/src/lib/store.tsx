@@ -21,19 +21,23 @@ import React, {
 } from "react";
 import {
   AppState,
-  Control,
   DayLog,
   defaultDayLog,
   defaultState,
   Entry,
-  Priority,
   Settings,
   Task,
-  TaskStatus,
   todayISO,
   uid,
   User,
 } from "./types";
+import {
+  makeTask,
+  nextOccurrence,
+  NewTaskInput,
+  refreshDue,
+  NEXT_STATUS,
+} from "./tasks";
 
 const STORAGE_KEY = "stoa:state:v1";
 const USERS_KEY = "stoa:users:v1";
@@ -87,7 +91,8 @@ export interface StoreValue {
   finishMorning: () => void;
   saveEvening: () => void;
   /* задачи */
-  addTask: (t: { title: string; priority: Priority; control: Control; dueToday: boolean }) => void;
+  addTask: (t: NewTaskInput) => void;
+  updateTask: (id: string, patch: Partial<Task>) => void;
   cycleTask: (id: string) => void;
   deleteTask: (id: string) => void;
   /* дневник */
@@ -98,6 +103,8 @@ export interface StoreValue {
   /* данные */
   exportData: () => void;
   resetData: () => void;
+  deleteAccount: () => void;
+  seedDemo: () => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -115,6 +122,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stored = loadJSON<AppState>(STORAGE_KEY, defaultState);
+    // «подкатка» сроков: задачи со сроком <= сегодня оживают в «Сегодня»
+    stored.tasks = refreshDue(stored.tasks, todayISO());
     setState(stored);
     loadedRef.current = true;
     setReady(true);
@@ -123,6 +132,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loadedRef.current) saveJSON(STORAGE_KEY, state);
   }, [state]);
+
+  /* Применение темы к <html data-theme> (токены из globals.css) */
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const resolved =
+        state.settings.theme === "system"
+          ? mq.matches
+            ? "dark"
+            : "light"
+          : state.settings.theme;
+      document.documentElement.dataset.theme = resolved;
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [state.settings.theme]);
 
   const todayKey = todayISO();
 
@@ -189,28 +215,30 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const addTask = useCallback(
-    (t: { title: string; priority: Priority; control: Control; dueToday: boolean }) => {
-      setState((s) => ({
-        ...s,
-        tasks: [
-          { id: uid(), status: "todo" as TaskStatus, createdAt: new Date().toISOString(), ...t },
-          ...s.tasks,
-        ],
-      }));
-    },
-    []
-  );
+  const addTask = useCallback((input: NewTaskInput) => {
+    setState((s) => ({ ...s, tasks: [makeTask(input), ...s.tasks] }));
+  }, []);
 
-  const cycleTask = useCallback((id: string) => {
+  const updateTask = useCallback((id: string, patch: Partial<Task>) => {
     setState((s) => ({
       ...s,
-      tasks: s.tasks.map((t) =>
-        t.id === id
-          ? { ...t, status: t.status === "todo" ? "doing" : t.status === "doing" ? "done" : "todo" }
-          : t
-      ),
+      tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
     }));
+  }, []);
+
+  const cycleTask = useCallback((id: string) => {
+    setState((s) => {
+      const task = s.tasks.find((t) => t.id === id);
+      if (!task) return s;
+      const status = NEXT_STATUS[task.status];
+      let tasks = s.tasks.map((t) => (t.id === id ? { ...t, status } : t));
+      // Повторяющаяся задача: при завершении создаём следующее вхождение (FR-K4)
+      if (status === "done" && task.recur && task.recur !== "none") {
+        const next = nextOccurrence(task);
+        if (next) tasks = [makeTask(next), ...tasks];
+      }
+      return { ...s, tasks };
+    });
   }, []);
 
   const deleteTask = useCallback((id: string) => {
@@ -260,6 +288,83 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setState(defaultState);
   }, []);
 
+  /** UC-10 / US-35: удаление аккаунта со всеми данными */
+  const deleteAccount = useCallback(() => {
+    resetData();
+  }, [resetData]);
+
+  /** Демо-данные для презентации: 3 дня активности, записи, задачи, избранные цитаты */
+  const seedDemo = useCallback(() => {
+    const d = (offset: number) => {
+      const dt = new Date();
+      dt.setDate(dt.getDate() - offset);
+      return dt.toISOString().slice(0, 10);
+    };
+    const past = (offset: number) => {
+      const dt = new Date();
+      dt.setDate(dt.getDate() - offset);
+      return dt.toISOString();
+    };
+    const days: Record<string, DayLog> = {
+      [d(2)]: {
+        ...defaultDayLog(),
+        morningDone: true,
+        eveningDone: true,
+        intention: "Спокойный день без гонки.",
+        q1: "Закончил проектную часть.",
+        q4: "Вечерний чай",
+      },
+      [d(1)]: {
+        ...defaultDayLog(),
+        morningDone: true,
+        eveningDone: true,
+        intention: "Один шаг к цели — уже успех.",
+        q2: "Ответ партнёра — вне контроля.",
+        q3: "Пауза перед ответом работает.",
+      },
+    };
+    const tasks: Task[] = [
+      makeTask({ title: "Прочитать главу Сенеки", priority: "P3", control: "in", dueToday: true, dueDate: todayISO(), recur: "daily" }, new Date(past(0))),
+      makeTask({ title: "Подготовить презентацию", priority: "P1", control: "in", dueToday: true, dueDate: todayISO() }, new Date(past(0))),
+      makeTask({ title: "Ответ партнёра по проекту", priority: "P2", control: "ex", reaction: "Напомнить один раз и отпустить", dueToday: true, dueDate: todayISO() }, new Date(past(0))),
+      makeTask({ title: "Спортзал 30 минут", priority: "P2", control: "in", dueToday: false, dueDate: d(-1) }, new Date(past(1))),
+    ];
+    const entries: Entry[] = [
+      {
+        id: uid(),
+        type: "practice",
+        content: "Дихотомия контроля: три тревоги из четырёх — вне моей власти. Стало заметно легче.",
+        mood: 4,
+        tags: ["практика"],
+        practiceId: "dichotomy-of-control",
+        createdAt: past(1),
+      },
+      {
+        id: uid(),
+        type: "evening",
+        content: "— Завершил черновик\n— Погода — вне контроля\n— План Б работает\n— За поддержку близких",
+        mood: 4,
+        tags: ["разбор"],
+        createdAt: past(1),
+      },
+      {
+        id: uid(),
+        type: "free",
+        content: "Поймал себя на тревоге из-за чужого мнения. Суждения других — не в моей власти.",
+        mood: 3,
+        tags: ["мысли"],
+        createdAt: past(2),
+      },
+    ];
+    setState((s) => ({
+      ...s,
+      days: { ...s.days, ...days },
+      tasks,
+      entries,
+      favoriteQuoteIds: [...new Set([...s.favoriteQuoteIds, 0, 6])],
+    }));
+  }, []);
+
   const day = state.days[todayKey] ?? defaultDayLog();
 
   const value = useMemo<StoreValue>(
@@ -276,6 +381,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       finishMorning,
       saveEvening,
       addTask,
+      updateTask,
       cycleTask,
       deleteTask,
       addEntry,
@@ -283,8 +389,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleFavoriteQuote,
       exportData,
       resetData,
+      deleteAccount,
+      seedDemo,
     }),
-    [state, ready, todayKey, day, signIn, signUp, signOut, setTheme, updateDay, finishMorning, saveEvening, addTask, cycleTask, deleteTask, addEntry, deleteEntry, toggleFavoriteQuote, exportData, resetData]
+    [
+      state,
+      ready,
+      todayKey,
+      day,
+      signIn,
+      signUp,
+      signOut,
+      setTheme,
+      updateDay,
+      finishMorning,
+      saveEvening,
+      addTask,
+      updateTask,
+      cycleTask,
+      deleteTask,
+      addEntry,
+      deleteEntry,
+      toggleFavoriteQuote,
+      exportData,
+      resetData,
+      deleteAccount,
+      seedDemo,
+    ]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

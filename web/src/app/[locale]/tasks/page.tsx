@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useStore } from "@/lib/store";
-import { Control, Priority, Task } from "@/lib/types";
-import { Badge, Button, Card, Chip, Input, Select } from "@/components/ui";
+import { Control, Priority, Recur, Task, todayISO } from "@/lib/types";
+import { Badge, Button, Card, Chip, Field, Input, Select } from "@/components/ui";
 
 type Filter = "all" | "today" | "in" | "ex";
 type View = "list" | "board";
@@ -18,14 +18,20 @@ const FILTERS: { id: Filter; key: string }[] = [
 
 export default function TasksPage() {
   const t = useTranslations("tasks");
-  const { state, addTask, cycleTask, deleteTask } = useStore();
+  const locale = useLocale();
+  const { state, addTask, updateTask, cycleTask, deleteTask } = useStore();
 
   const [view, setView] = useState<View>("list");
   const [filter, setFilter] = useState<Filter>("all");
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("P2");
   const [control, setControl] = useState<Control>("in");
+  const [due, setDue] = useState<"today" | "tomorrow" | "none">("today");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+
+  const today = todayISO();
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
   const flashAnd = (msg: string, fn: () => void) => {
     fn();
@@ -37,7 +43,13 @@ export default function TasksPage() {
     e.preventDefault();
     if (!title.trim()) return;
     flashAnd(t("added"), () =>
-      addTask({ title: title.trim(), priority, control, dueToday: true })
+      addTask({
+        title: title.trim(),
+        priority,
+        control,
+        dueToday: due === "today",
+        dueDate: due === "none" ? undefined : due === "today" ? today : tomorrow,
+      })
     );
     setTitle("");
   };
@@ -54,6 +66,8 @@ export default function TasksPage() {
         return true;
     }
   });
+
+  const editing = editingId ? state.tasks.find((x) => x.id === editingId) : undefined;
 
   return (
     <div>
@@ -88,6 +102,20 @@ export default function TasksPage() {
         </div>
       )}
 
+      {editing && (
+        <TaskEditor
+          task={editing}
+          today={today}
+          tomorrow={tomorrow}
+          locale={locale}
+          onCancel={() => setEditingId(null)}
+          onSave={(patch) => {
+            updateTask(editing.id, patch);
+            setEditingId(null);
+          }}
+        />
+      )}
+
       <Card className="mb-5">
         <form onSubmit={submit} className="flex flex-wrap items-center gap-2.5">
           <Input
@@ -105,6 +133,11 @@ export default function TasksPage() {
             <option value="in">⭕ {t("inControl")}</option>
             <option value="ex">◌ {t("outControl")}</option>
           </Select>
+          <Select value={due} onChange={(e) => setDue(e.target.value as never)} className="w-36">
+            <option value="today">{t("dueToday")}</option>
+            <option value="tomorrow">{t("dueTomorrow")}</option>
+            <option value="none">{t("dueNone")}</option>
+          </Select>
           <Button type="submit">{t("add")}</Button>
         </form>
       </Card>
@@ -119,7 +152,9 @@ export default function TasksPage() {
             <TaskCard
               key={task.id}
               task={task}
+              locale={locale}
               onCycle={() => cycleTask(task.id)}
+              onEdit={() => setEditingId(editingId === task.id ? null : task.id)}
               onDelete={() => deleteTask(task.id)}
             />
           ))}
@@ -131,17 +166,136 @@ export default function TasksPage() {
   );
 }
 
+/* ---------- Редактор задачи (инлайн) ---------- */
+
+function TaskEditor({
+  task,
+  today,
+  tomorrow,
+  locale,
+  onSave,
+  onCancel,
+}: {
+  task: Task;
+  today: string;
+  tomorrow: string;
+  locale: string;
+  onSave: (patch: Partial<Task>) => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations("tasks");
+  const [title, setTitle] = useState(task.title);
+  const [note, setNote] = useState(task.note ?? "");
+  const [priority, setPriority] = useState<Priority>(task.priority);
+  const [control, setControl] = useState<Control>(task.control);
+  const [reaction, setReaction] = useState(task.reaction ?? "");
+  const [dueDate, setDueDate] = useState(task.dueDate ?? "");
+  const [recur, setRecur] = useState<Recur>(task.recur ?? "none");
+
+  const save = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave({
+      title: title.trim(),
+      note: note.trim() || undefined,
+      priority,
+      control,
+      reaction: control === "ex" ? reaction.trim() || undefined : undefined,
+      dueToday: dueDate === today,
+      dueDate: dueDate || undefined,
+      recur,
+    });
+  };
+
+  return (
+    <Card className="mb-5 animate-fadeUp border-l-4 border-l-accent">
+      <div className="mb-3 text-xs font-semibold uppercase tracking-[.1em] text-soft">{t("edit")}</div>
+      <form onSubmit={save} className="space-y-3.5">
+        <Field label={t("titleField")}>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        <Field label={t("note")}>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("notePh")} />
+        </Field>
+        <div className="flex flex-wrap gap-3">
+          <Field label={t("priority")}>
+            <Select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className="w-24">
+              <option>P1</option>
+              <option>P2</option>
+              <option>P3</option>
+            </Select>
+          </Field>
+          <Field label={t("due")}>
+            <Input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-44"
+              max="2030-12-31"
+            />
+          </Field>
+          <Field label={t("recur")}>
+            <Select value={recur} onChange={(e) => setRecur(e.target.value as Recur)} className="w-36">
+              <option value="none">{t("recurNone")}</option>
+              <option value="daily">{t("recurDaily")}</option>
+              <option value="weekly">{t("recurWeekly")}</option>
+            </Select>
+          </Field>
+        </div>
+        <Field label={t("control")}>
+          <div className="flex flex-wrap gap-2">
+            <Chip active={control === "in"} onClick={() => setControl("in")}>
+              {t("inControl")}
+            </Chip>
+            <Chip active={control === "ex"} onClick={() => setControl("ex")}>
+              {t("outControl")}
+            </Chip>
+          </div>
+        </Field>
+        {control === "ex" && (
+          <Field label={t("reaction")}>
+            <Input value={reaction} onChange={(e) => setReaction(e.target.value)} placeholder={t("reactionPh")} />
+          </Field>
+        )}
+        <div className="flex gap-2 pt-1">
+          <Button type="submit">{t("save")}</Button>
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            {t("cancel")}
+          </Button>
+        </div>
+      </form>
+      <div className="mt-3 text-xs text-soft">
+        {dueDate === tomorrow ? t("dueTomorrow") : ""}
+      </div>
+    </Card>
+  );
+}
+
+/* ---------- Карточка задачи ---------- */
+
 function TaskCard({
   task,
+  locale,
   onCycle,
+  onEdit,
   onDelete,
 }: {
   task: Task;
+  locale: string;
   onCycle: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const t = useTranslations("tasks");
   const done = task.status === "done";
+
+  const dueLabel = task.dueDate
+    ? new Date(task.dueDate + "T00:00:00").toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
+        day: "numeric",
+        month: "short",
+      })
+    : null;
+
   return (
     <Card className="animate-fadeUp group flex items-start gap-3.5">
       <button
@@ -159,18 +313,30 @@ function TaskCard({
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Badge tone="neutral">{task.priority}</Badge>
           {task.dueToday && <Badge tone="accent">{t("today")}</Badge>}
+          {!task.dueToday && dueLabel && <Badge tone="neutral">📅 {dueLabel}</Badge>}
+          {task.recur !== "none" && <Badge tone="neutral">↻ {t(task.recur === "daily" ? "recurDaily" : "recurWeekly")}</Badge>}
           <Badge tone={task.control === "in" ? "sage" : "clay"}>
             {task.control === "in" ? t("inControl") : t("outControl")}
           </Badge>
           {task.reaction && <Badge tone="neutral">↳ {task.reaction}</Badge>}
         </div>
       </div>
-      <button
-        onClick={onDelete}
-        className="min-h-9 rounded-md px-2.5 text-sm text-clay opacity-0 transition-opacity hover:bg-clayBg group-hover:opacity-100"
-      >
-        ✕
-      </button>
+      <div className="flex flex-col">
+        <button
+          onClick={onEdit}
+          aria-label={t("edit")}
+          className="flex h-9 w-9 items-center justify-center rounded-md text-sm text-soft transition-colors hover:bg-surface2"
+        >
+          ✎
+        </button>
+        <button
+          onClick={onDelete}
+          aria-label={t("delete")}
+          className="flex h-9 w-9 items-center justify-center rounded-md text-sm text-clay transition-colors hover:bg-clayBg"
+        >
+          ✕
+        </button>
+      </div>
     </Card>
   );
 }
@@ -199,6 +365,7 @@ function Board({ tasks, onCycle }: { tasks: Task[]; onCycle: (id: string) => voi
                   <div className="text-sm font-medium">{task.title}</div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <Badge tone="neutral">{task.priority}</Badge>
+                    {task.recur !== "none" && <Badge tone="neutral">↻</Badge>}
                     <Badge tone={task.control === "in" ? "sage" : "clay"}>
                       {task.control === "in" ? "⭕" : "◌"}
                     </Badge>

@@ -24,7 +24,7 @@
 | 08. Тест-кейсы и критерии приёмки | ✅ Готово |
 | 09. План сборки и контент-план | ✅ Готово |
 | 10. Интерактивный прототип UI | ✅ Готово — `prototype/index.html` |
-| 11. Реализация MVP (код) | 🔨 В работе — `web/` (Next.js): каркас, i18n RU/EN, 2 темы, аккаунт (демо-адаптер), цикл дня, дневник, задачи, гид, настройки |
+| 11. Реализация MVP (код) | 🔨 В работе — `web/` (Next.js): каркас, i18n RU/EN, 2 темы, аккаунт (демо-адаптер), цикл дня, дневник (+поиск, черновик), задачи (+сроки, повторы, редактирование), гид, настройки (+удаление аккаунта). Схема Supabase + RLS в `supabase/`, E2E + CI |
 
 ## Структура документации
 
@@ -55,12 +55,15 @@
 cd web
 npm install
 npm run dev        # http://localhost:3000 (редирект на /ru)
-npm test           # юнит-тесты бизнес-логики (vitest)
+npm test           # юнит-тесты бизнес-логики (vitest, 19 тестов)
+npm run test:e2e   # E2E (Playwright; в CI прогоняется автоматически)
 npm run build      # производственная сборка
 ```
 
 Демо-режим: аккаунт хранится локально в браузере (LocalAdapter, `web/src/lib/store.tsx`).
-Боевой режим: задайте `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY` — см. [docs/07-backend.md](docs/07-backend.md).
+Боевой режим: задайте `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY` (см. `web/.env.example`) и примените миграции из `supabase/migrations/` — инструкция в [supabase/README.md](supabase/README.md) и [docs/07-backend.md](docs/07-backend.md).
+
+CI: [.github/workflows/ci.yml](.github/workflows/ci.yml) — юнит-тесты → сборка → E2E на каждом push и PR.
 
 ## Прототип
 
