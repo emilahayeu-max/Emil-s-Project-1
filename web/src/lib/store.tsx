@@ -1,13 +1,17 @@
 "use client";
 
 /**
- * Хранилище приложения.
+ * Хранилище приложения (единая точка данных для UI).
  *
- * Уровень доступа к данным реализован как АДАПТЕР: сейчас работает
- * LocalAdapter (localStorage, демо-режим — песочница/предпросмотр),
- * а в боевом режиме подключается SupabaseAdapter по env-переменным
- * (NEXT_PUBLIC_SUPABASE_URL + ANON_KEY) — см. docs/07-backend.md.
- * Доменные типы и действия не меняются при смене адаптера.
+ * Работает поверх DataAdapter (lib/adapter.ts):
+ *  - без ключей Supabase → LocalAdapter (демо-режим, localStorage);
+ *  - с ключами (NEXT_PUBLIC_SUPABASE_URL + ANON_KEY) → SupabaseAdapter (облако).
+ *
+ * Принципы:
+ *  - гидратация: при старте читаем сессию и данные из адаптера;
+ *  - оптимистичные обновления: UI меняется сразу, запись в адаптер — фоном;
+ *  - ошибки записи попадают в state.syncError и показываются баннером;
+ *  - в демо-режиме всё состояние дополнительно автосохраняется в localStorage.
  */
 
 import React, {
@@ -31,6 +35,7 @@ import {
   uid,
   User,
 } from "./types";
+import { createAdapter, DataAdapter } from "./adapter";
 import {
   makeTask,
   nextOccurrence,
@@ -39,40 +44,6 @@ import {
   NEXT_STATUS,
 } from "./tasks";
 
-const STORAGE_KEY = "stoa:state:v1";
-const USERS_KEY = "stoa:users:v1";
-
-/* ---------- LocalAdapter (демо-режим) ---------- */
-
-interface StoredUser extends User {
-  pass: string; // демо-хэш (djb2) — только для прототипа, не для продакшена
-}
-
-function demoHash(s: string): string {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-  return h.toString(16);
-}
-
-function loadJSON<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? { ...fallback, ...(JSON.parse(raw) as T) } : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveJSON(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* переполнение хранилища — молча пропускаем в демо */
-  }
-}
-
 /* ---------- Контекст ---------- */
 
 export interface StoreValue {
@@ -80,10 +51,13 @@ export interface StoreValue {
   ready: boolean;
   todayKey: string;
   day: DayLog;
+  /** какой источник данных активен: облако или демо */
+  backend: DataAdapter["kind"];
+  syncError: string | null;
   /* аккаунт */
-  signIn: (email: string, password: string) => string | null;
-  signUp: (name: string, email: string, password: string) => string | null;
-  signOut: () => void;
+  signIn: (email: string, password: string) => Promise<string | null>;
+  signUp: (name: string, email: string, password: string) => Promise<string | null>;
+  signOut: () => Promise<void>;
   /* настройки */
   setTheme: (theme: Settings["theme"]) => void;
   /* цикл дня */
@@ -102,8 +76,7 @@ export interface StoreValue {
   toggleFavoriteQuote: (id: number) => void;
   /* данные */
   exportData: () => void;
-  resetData: () => void;
-  deleteAccount: () => void;
+  deleteAccount: () => Promise<void>;
   seedDemo: () => void;
 }
 
@@ -118,22 +91,71 @@ export function useStore(): StoreValue {
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(defaultState);
   const [ready, setReady] = useState(false);
-  const loadedRef = useRef(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const adapter = useMemo(() => createAdapter(), []);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const hydratedRef = useRef(false);
 
+  /* ---------- Гидратация из адаптера ---------- */
   useEffect(() => {
-    const stored = loadJSON<AppState>(STORAGE_KEY, defaultState);
-    // «подкатка» сроков: задачи со сроком <= сегодня оживают в «Сегодня»
-    stored.tasks = refreshDue(stored.tasks, todayISO());
-    setState(stored);
-    loadedRef.current = true;
-    setReady(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const user = await adapter.getSession();
+        if (!user) {
+          setReady(true);
+          return;
+        }
+        const data = await adapter.loadAll();
+        if (cancelled) return;
+        setState({
+          user,
+          settings: { theme: data.theme },
+          tasks: refreshDue(data.tasks, todayISO()),
+          entries: data.entries,
+          days: data.days,
+          favoriteQuoteIds: data.favoriteQuoteIds,
+        });
+        hydratedRef.current = true;
+      } catch (e) {
+        console.error("stoa: ошибка загрузки данных", e);
+        setSyncError(String(e));
+      }
+      setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [adapter]);
+
+  /* В демо-режиме всё состояние автосохраняется в localStorage */
+  useEffect(() => {
+    if (!hydratedRef.current || adapter.kind !== "local") return;
+    try {
+      window.localStorage.setItem("stoa:state:v1", JSON.stringify(state));
+    } catch {
+      /* переполнение — пропускаем */
+    }
+  }, [state, adapter.kind]);
+
+  /* ---------- Фоновая запись в адаптер ---------- */
+  const persist = useCallback(
+    (op: () => Promise<void>) => {
+      setSyncError(null);
+      void op().catch((e) => {
+        console.error("stoa: ошибка синхронизации", e);
+        setSyncError(e instanceof Error ? e.message : String(e));
+      });
+    },
+    []
+  );
+
+  const applyState = useCallback((updater: (s: AppState) => AppState) => {
+    setState((s) => updater(s));
   }, []);
 
-  useEffect(() => {
-    if (loadedRef.current) saveJSON(STORAGE_KEY, state);
-  }, [state]);
-
-  /* Применение темы к <html data-theme> (токены из globals.css) */
+  /* ---------- Тема ---------- */
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
@@ -150,127 +172,192 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", apply);
   }, [state.settings.theme]);
 
-  const todayKey = todayISO();
+  /* ---------- Аккаунт ---------- */
 
-  const signIn = useCallback((email: string, password: string): string | null => {
-    const users = loadJSON<Record<string, StoredUser>>(USERS_KEY, {});
-    const user = users[email.toLowerCase()];
-    if (!user || user.pass !== demoHash(password)) return "auth.errorCredentials";
-    setState((s) => ({ ...s, user: { email: user.email, name: user.name } }));
-    return null;
-  }, []);
+  const hydrateAfterAuth = useCallback(
+    async (): Promise<string | null> => {
+      const user = await adapter.getSession();
+      if (!user) return "auth.errorGeneric";
+      const data = await adapter.loadAll();
+      setState({
+        user,
+        settings: { theme: data.theme },
+        tasks: refreshDue(data.tasks, todayISO()),
+        entries: data.entries,
+        days: data.days,
+        favoriteQuoteIds: data.favoriteQuoteIds,
+      });
+      hydratedRef.current = true;
+      return null;
+    },
+    [adapter]
+  );
 
-  const signUp = useCallback((name: string, email: string, password: string): string | null => {
-    const users = loadJSON<Record<string, StoredUser>>(USERS_KEY, {});
-    const key = email.toLowerCase();
-    if (users[key]) return "auth.errorExists";
-    const user: StoredUser = { name, email, pass: demoHash(password) };
-    users[key] = user;
-    saveJSON(USERS_KEY, users);
-    setState((s) => ({ ...s, user: { email: user.email, name: user.name } }));
-    return null;
-  }, []);
+  const signIn = useCallback(
+    async (email: string, password: string): Promise<string | null> => {
+      const err = await adapter.signIn(email, password);
+      if (err) return err;
+      return hydrateAfterAuth();
+    },
+    [adapter, hydrateAfterAuth]
+  );
 
-  const signOut = useCallback(() => setState((s) => ({ ...s, user: null })), []);
+  const signUp = useCallback(
+    async (name: string, email: string, password: string): Promise<string | null> => {
+      const err = await adapter.signUp(name, email, password);
+      if (err) return err;
+      return hydrateAfterAuth();
+    },
+    [adapter, hydrateAfterAuth]
+  );
 
-  const setTheme = useCallback((theme: Settings["theme"]) => {
-    setState((s) => ({ ...s, settings: { ...s.settings, theme } }));
-  }, []);
+  const signOut = useCallback(async () => {
+    await adapter.signOut();
+    setState(defaultState);
+  }, [adapter]);
 
-  const updateDay = useCallback((patch: Partial<DayLog>) => {
-    setState((s) => ({
-      ...s,
-      days: {
-        ...s.days,
-        [todayISO()]: { ...(s.days[todayISO()] ?? defaultDayLog()), ...patch },
-      },
-    }));
-  }, []);
+  const setTheme = useCallback(
+    (theme: Settings["theme"]) => {
+      applyState((s) => ({ ...s, settings: { ...s.settings, theme } }));
+      persist(() => adapter.setTheme(theme));
+    },
+    [adapter, applyState, persist]
+  );
 
-  const finishMorning = useCallback(() => {
-    updateDay({ morningDone: true });
-  }, [updateDay]);
+  /* ---------- Цикл дня ---------- */
+
+  const updateDay = useCallback(
+    (patch: Partial<DayLog>) => {
+      const k = todayISO();
+      const s = stateRef.current;
+      const day = { ...(s.days[k] ?? defaultDayLog()), ...patch };
+      applyState((prev) => ({ ...prev, days: { ...prev.days, [k]: day } }));
+      persist(() => adapter.saveDay(day, k));
+    },
+    [adapter, applyState, persist]
+  );
+
+  const finishMorning = useCallback(() => updateDay({ morningDone: true }), [updateDay]);
 
   const saveEvening = useCallback(() => {
-    setState((s) => {
-      const k = todayISO();
-      const day = { ...(s.days[k] ?? defaultDayLog()), eveningDone: true };
-      const content = [day.q1, day.q2, day.q3, day.q4]
-        .map((q, i) => q.trim() && `${["—", "—", "—", "—"][i]} ${q.trim()}`)
-        .filter(Boolean)
-        .join("\n");
-      const entry: Entry = {
-        id: uid(),
-        type: "evening",
-        content: content || "—",
-        mood: 3,
-        tags: ["разбор"],
-        createdAt: new Date().toISOString(),
-      };
-      return {
-        ...s,
-        days: { ...s.days, [k]: day },
-        entries: [entry, ...s.entries],
-      };
-    });
-  }, []);
-
-  const addTask = useCallback((input: NewTaskInput) => {
-    setState((s) => ({ ...s, tasks: [makeTask(input), ...s.tasks] }));
-  }, []);
-
-  const updateTask = useCallback((id: string, patch: Partial<Task>) => {
-    setState((s) => ({
-      ...s,
-      tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    const k = todayISO();
+    const s = stateRef.current;
+    const day = { ...(s.days[k] ?? defaultDayLog()), eveningDone: true };
+    const content = [day.q1, day.q2, day.q3, day.q4]
+      .map((q, i) => q.trim() && `${["—", "—", "—", "—"][i]} ${q.trim()}`)
+      .filter(Boolean)
+      .join("\n");
+    const entry: Entry = {
+      id: uid(),
+      type: "evening",
+      content: content || "—",
+      mood: 3,
+      tags: ["разбор"],
+      createdAt: new Date().toISOString(),
+    };
+    applyState((prev) => ({
+      ...prev,
+      days: { ...prev.days, [k]: day },
+      entries: [entry, ...prev.entries],
     }));
-  }, []);
-
-  const cycleTask = useCallback((id: string) => {
-    setState((s) => {
-      const task = s.tasks.find((t) => t.id === id);
-      if (!task) return s;
-      const status = NEXT_STATUS[task.status];
-      let tasks = s.tasks.map((t) => (t.id === id ? { ...t, status } : t));
-      // Повторяющаяся задача: при завершении создаём следующее вхождение (FR-K4)
-      if (status === "done" && task.recur && task.recur !== "none") {
-        const next = nextOccurrence(task);
-        if (next) tasks = [makeTask(next), ...tasks];
-      }
-      return { ...s, tasks };
+    persist(async () => {
+      await adapter.saveDay(day, k);
+      await adapter.addEntry(entry);
     });
-  }, []);
+  }, [adapter, applyState, persist]);
 
-  const deleteTask = useCallback((id: string) => {
-    setState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
-  }, []);
+  /* ---------- Задачи ---------- */
+
+  const addTask = useCallback(
+    (input: NewTaskInput) => {
+      const task = makeTask(input);
+      applyState((s) => ({ ...s, tasks: [task, ...s.tasks] }));
+      persist(() => adapter.addTask(task));
+    },
+    [adapter, applyState, persist]
+  );
+
+  const updateTask = useCallback(
+    (id: string, patch: Partial<Task>) => {
+      applyState((s) => ({
+        ...s,
+        tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+      }));
+      persist(() => adapter.updateTask(id, patch));
+    },
+    [adapter, applyState, persist]
+  );
+
+  const cycleTask = useCallback(
+    (id: string) => {
+      const s = stateRef.current;
+      const task = s.tasks.find((t) => t.id === id);
+      if (!task) return;
+      const status = NEXT_STATUS[task.status];
+      // Повторяющаяся задача: при завершении создаём следующее вхождение (FR-K4)
+      const next =
+        status === "done" && task.recur && task.recur !== "none"
+          ? nextOccurrence(task)
+          : null;
+      let tasks = s.tasks.map((t) => (t.id === id ? { ...t, status } : t));
+      if (next) tasks = [makeTask(next), ...tasks];
+      applyState((prev) => ({ ...prev, tasks }));
+      persist(async () => {
+        await adapter.updateTask(id, { status });
+        if (next) await adapter.addTask(makeTask(next));
+      });
+    },
+    [adapter, applyState, persist]
+  );
+
+  const deleteTask = useCallback(
+    (id: string) => {
+      applyState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
+      persist(() => adapter.deleteTask(id));
+    },
+    [adapter, applyState, persist]
+  );
+
+  /* ---------- Дневник ---------- */
 
   const addEntry = useCallback(
     (e: { type: Entry["type"]; content: string; mood: number; tags: string[]; practiceId?: string }) => {
-      setState((s) => ({
-        ...s,
-        entries: [{ id: uid(), createdAt: new Date().toISOString(), ...e }, ...s.entries],
-      }));
+      const entry: Entry = { id: uid(), createdAt: new Date().toISOString(), ...e };
+      applyState((s) => ({ ...s, entries: [entry, ...s.entries] }));
+      persist(() => adapter.addEntry(entry));
     },
-    []
+    [adapter, applyState, persist]
   );
 
-  const deleteEntry = useCallback((id: string) => {
-    setState((s) => ({ ...s, entries: s.entries.filter((e) => e.id !== id) }));
-  }, []);
+  const deleteEntry = useCallback(
+    (id: string) => {
+      applyState((s) => ({ ...s, entries: s.entries.filter((e) => e.id !== id) }));
+      persist(() => adapter.deleteEntry(id));
+    },
+    [adapter, applyState, persist]
+  );
 
-  const toggleFavoriteQuote = useCallback((id: number) => {
-    setState((s) => ({
-      ...s,
-      favoriteQuoteIds: s.favoriteQuoteIds.includes(id)
-        ? s.favoriteQuoteIds.filter((x) => x !== id)
-        : [...s.favoriteQuoteIds, id],
-    }));
-  }, []);
+  /* ---------- Цитаты ---------- */
+
+  const toggleFavoriteQuote = useCallback(
+    (id: number) => {
+      const on = !stateRef.current.favoriteQuoteIds.includes(id);
+      applyState((s) => ({
+        ...s,
+        favoriteQuoteIds: on
+          ? [...s.favoriteQuoteIds, id]
+          : s.favoriteQuoteIds.filter((x) => x !== id),
+      }));
+      persist(() => adapter.setFavorite(id, on));
+    },
+    [adapter, applyState, persist]
+  );
+
+  /* ---------- Данные ---------- */
 
   const exportData = useCallback(() => {
     const blob = new Blob(
-      [JSON.stringify({ exportedAt: new Date().toISOString(), ...state }, null, 2)],
+      [JSON.stringify({ exportedAt: new Date().toISOString(), ...stateRef.current }, null, 2)],
       { type: "application/json" }
     );
     const a = document.createElement("a");
@@ -278,22 +365,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     a.download = `stoa-export-${todayISO()}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
-  }, [state]);
-
-  const resetData = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(STORAGE_KEY);
-      window.localStorage.removeItem(USERS_KEY);
-    }
-    setState(defaultState);
   }, []);
 
-  /** UC-10 / US-35: удаление аккаунта со всеми данными */
-  const deleteAccount = useCallback(() => {
-    resetData();
-  }, [resetData]);
+  /** UC-10: удаление аккаунта со всеми данными (в облаке — каскадно через RLS) */
+  const deleteAccount = useCallback(async () => {
+    await adapter.deleteAllUserData();
+    setState(defaultState);
+  }, [adapter]);
 
-  /** Демо-данные для презентации: 3 дня активности, записи, задачи, избранные цитаты */
+  /** Демо-данные для презентации */
   const seedDemo = useCallback(() => {
     const d = (offset: number) => {
       const dt = new Date();
@@ -365,6 +445,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const todayKey = todayKeyOf();
   const day = state.days[todayKey] ?? defaultDayLog();
 
   const value = useMemo<StoreValue>(
@@ -373,6 +454,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ready,
       todayKey,
       day,
+      backend: adapter.kind,
+      syncError,
       signIn,
       signUp,
       signOut,
@@ -388,7 +471,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       deleteEntry,
       toggleFavoriteQuote,
       exportData,
-      resetData,
       deleteAccount,
       seedDemo,
     }),
@@ -397,6 +479,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ready,
       todayKey,
       day,
+      adapter.kind,
+      syncError,
       signIn,
       signUp,
       signOut,
@@ -412,11 +496,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       deleteEntry,
       toggleFavoriteQuote,
       exportData,
-      resetData,
       deleteAccount,
       seedDemo,
     ]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
+
+function todayKeyOf(): string {
+  return todayISO();
 }

@@ -40,10 +40,11 @@
 | [docs/07-backend.md](docs/07-backend.md) | Выбор бэкенда: сравнение и обоснование |
 | [docs/08-testing.md](docs/08-testing.md) | Тест-кейсы и критерии приёмки |
 | [docs/09-build-plan.md](docs/09-build-plan.md) | План сборки, спринты, контент-план |
+| [docs/10-supabase-setup.md](docs/10-supabase-setup.md) | ☁ Подключение облака Supabase: инструкция для новичка, по шагам |
 
 ## Ключевые решения
 
-- **Бэкенд**: облако, **Supabase (бесплатный тир)** — Postgres + Auth + RLS + Storage, $0. Уровень данных реализован как адаптер: в демо-режиме работает localStorage-адаптер (без ключей), при наличии `NEXT_PUBLIC_SUPABASE_URL` подключается Supabase.
+- **Бэкенд**: облако, **Supabase (бесплатный тир)** — Postgres + Auth + RLS + Storage, $0. Слой данных реализован как **адаптер** (`web/src/lib/adapter.ts`): без ключей работает демо-режим (localStorage), при задании `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY` приложение **автоматически переключается на облако** (SupabaseAdapter: сессии, гидратация, оптимистичные записи, каскадное удаление аккаунта). Подключение по шагам — [docs/10-supabase-setup.md](docs/10-supabase-setup.md).
 - **Фронтенд**: **Next.js 15 + TypeScript + Tailwind CSS**, хостинг Vercel (бесплатный).
 - **Языки**: русский + английский (next-intl, локали /ru и /en, переключение на лету).
 - **Приватность**: дневник — чувствительные данные; Row Level Security на уровне БД, экспорт и удаление аккаунта по требованию.

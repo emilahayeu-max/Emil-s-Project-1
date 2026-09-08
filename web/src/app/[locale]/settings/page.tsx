@@ -15,7 +15,7 @@ export default function SettingsPage() {
   const locale = useLocale() as "ru" | "en";
   const router = useRouter();
   const pathname = usePathname();
-  const { state, setTheme, signOut, exportData, deleteAccount, seedDemo } = useStore();
+  const { state, setTheme, signOut, exportData, deleteAccount, seedDemo, backend } = useStore();
 
   const [confirmEmail, setConfirmEmail] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
@@ -89,6 +89,11 @@ export default function SettingsPage() {
             <option value="system">{t("themeSystem")}</option>
           </Select>
         </Row>
+        <Row label={t("backend")} icon="🗄">
+          <span className="text-sm text-soft">
+            {backend === "supabase" ? t("backendCloud") : t("backendLocal")}
+          </span>
+        </Row>
         <Row label={t("reminders")} icon="⏰">
           <span className="text-sm text-soft">8:00 · 21:00 ({t("remindersPh")})</span>
         </Row>
@@ -123,10 +128,10 @@ export default function SettingsPage() {
         </div>
         <form
           className="mt-3 flex flex-wrap items-center gap-2.5"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             if (emailMatches && confirm(t("deleteConfirm"))) {
-              deleteAccount();
+              await deleteAccount();
               router.replace("/login");
               router.refresh();
             }

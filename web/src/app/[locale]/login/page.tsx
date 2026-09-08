@@ -9,17 +9,20 @@ import { Button, Card, Field, Input } from "@/components/ui";
 export default function LoginPage() {
   const t = useTranslations("auth");
   const router = useRouter();
-  const { signIn, signUp } = useStore();
+  const { signIn, signUp, backend } = useStore();
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError(t("errorEmail"));
       return;
@@ -28,14 +31,25 @@ export default function LoginPage() {
       setError(t("errorPassword"));
       return;
     }
-    const err =
-      mode === "signin" ? signIn(email, password) : signUp(name.trim() || email.split("@")[0], email, password);
-    if (err) {
-      setError(t(err));
-      return;
+    setBusy(true);
+    try {
+      const err =
+        mode === "signin"
+          ? await signIn(email, password)
+          : await signUp(name.trim() || email.split("@")[0], email, password);
+      if (err === "auth.checkEmail") {
+        setNotice(t("checkEmail"));
+        return;
+      }
+      if (err) {
+        setError(t(err));
+        return;
+      }
+      router.replace(mode === "signup" ? "/onboarding" : "/");
+      router.refresh();
+    } finally {
+      setBusy(false);
     }
-    router.replace(mode === "signup" ? "/onboarding" : "/");
-    router.refresh();
   };
 
   return (
@@ -76,8 +90,11 @@ export default function LoginPage() {
               />
             </Field>
             {error && <p className="text-sm text-clay">{error}</p>}
-            <Button type="submit" className="w-full">
-              {mode === "signin" ? t("signin") : t("signup")}
+            {notice && (
+              <p className="rounded-md bg-sageBg px-3.5 py-2.5 text-sm text-sage">{notice}</p>
+            )}
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? "…" : mode === "signin" ? t("signin") : t("signup")}
             </Button>
           </form>
           <div className="mt-4 flex items-center justify-between text-sm">
@@ -88,7 +105,9 @@ export default function LoginPage() {
           </div>
         </Card>
 
-        <p className="mt-5 text-center text-[13px] leading-relaxed text-soft">{t("demoNote")}</p>
+        <p className="mt-5 text-center text-[13px] leading-relaxed text-soft">
+          {backend === "supabase" ? t("cloudNote") : t("demoNote")}
+        </p>
       </div>
     </div>
   );

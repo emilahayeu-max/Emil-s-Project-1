@@ -15,9 +15,10 @@ const NAV = [
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const t = useTranslations("nav");
+  const te = useTranslations("errors");
   const pathname = usePathname();
   const router = useRouter();
-  const { state, ready, signOut } = useStore();
+  const { state, ready, syncError, signOut } = useStore();
 
   // Без логотипа/навигации — только вход и онбординг
   const bare = pathname.includes("/login") || pathname.includes("/onboarding");
@@ -38,9 +39,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         children
       ) : (
         <div className="md:pl-60">
-          <Sidebar t={t} pathname={pathname} user={state.user?.name} onSignOut={signOut} />
+          <Sidebar t={t} pathname={pathname} user={state.user?.name} onSignOut={() => void signOut()} />
           <TopBar />
           <main className="mx-auto min-h-screen max-w-3xl px-5 pb-28 pt-2 md:max-w-4xl md:px-10 md:pb-16">
+            {syncError && (
+              <div className="mb-4 rounded-md border border-clay bg-clayBg px-4 py-3 text-sm text-clay">
+                ⚠ {te("sync")} <span className="opacity-70">({syncError})</span>
+              </div>
+            )}
             {children}
           </main>
           <BottomNav t={t} pathname={pathname} />

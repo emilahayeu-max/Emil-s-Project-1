@@ -26,7 +26,8 @@ create table if not exists public.journal_entries (
   content text not null,
   mood smallint check (mood between 1 and 5),
   tags text[] not null default '{}',
-  practice_id uuid,
+  -- слаги практик (напр. 'dichotomy-of-control') — совпадают с web/src/lib/practices.ts
+  practice_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -135,6 +136,8 @@ create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = id);
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = id);
+create policy "profiles_delete_own" on public.profiles
+  for delete using (auth.uid() = id);
 
 -- journal_entries: только свои записи
 create policy "entries_select_own" on public.journal_entries
@@ -179,6 +182,8 @@ create policy "practice_logs_select_own" on public.practice_logs
   for select using (auth.uid() = user_id);
 create policy "practice_logs_insert_own" on public.practice_logs
   for insert with check (auth.uid() = user_id);
+create policy "practice_logs_delete_own" on public.practice_logs
+  for delete using (auth.uid() = user_id);
 
 -- favorite_quotes: только свои
 create policy "favorites_select_own" on public.favorite_quotes

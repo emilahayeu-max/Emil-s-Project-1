@@ -23,11 +23,17 @@
     "switchToSignup": "No account? Sign up",
     "switchToSignin": "Already have an account? Sign in",
     "signOut": "Sign out",
-    "demoNote": "Demo mode: the account is stored locally in this browser (data adapter). In production, Supabase Auth is connected — see the docs.",
+    "demoNote": "Demo mode: data lives only in this browser. Connect Supabase cloud — see docs/10-supabase-setup.md.",
+    "cloudNote": "☁ Cloud mode: data is stored in Supabase and synced across devices.",
+    "checkEmail": "📬 Check your inbox: we sent a confirmation link. After clicking it, come back and sign in.",
     "errorEmail": "Enter a valid email.",
     "errorPassword": "Password must be at least 6 characters.",
     "errorCredentials": "Wrong email or password.",
-    "errorExists": "A user with this email already exists — sign in instead."
+    "errorExists": "A user with this email already exists — sign in instead.",
+    "errorGeneric": "Something went wrong. Check your connection and try again."
+  },
+  "errors": {
+    "sync": "Could not save changes to the cloud. Check your connection and try again."
   },
   "onboarding": {
     "skip": "Skip",
@@ -150,6 +156,9 @@
     "practices": "practices",
     "avgMood": "avg mood",
     "language": "Interface language",
+    "backend": "Data source",
+    "backendCloud": "Supabase (cloud) ☁",
+    "backendLocal": "Demo (this browser)",
     "theme": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
