@@ -29,6 +29,9 @@ export default async function LocaleLayout({
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
+  // Префикс для статического хостинга (GitHub Pages); в обычном режиме пустой
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
@@ -38,9 +41,9 @@ export default async function LocaleLayout({
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700&display=swap"
         />
         {/* PWA: манифест и иконка */}
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="icon" href="/icons/icon-192.png" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="manifest" href={`${base}/manifest.webmanifest`} />
+        <link rel="icon" href={`${base}/icons/icon-192.png`} />
+        <link rel="apple-touch-icon" href={`${base}/icons/icon-192.png`} />
         <meta name="theme-color" content="#A97E4F" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Стоя" />
