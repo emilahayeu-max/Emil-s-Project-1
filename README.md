@@ -41,6 +41,7 @@
 | [docs/08-testing.md](docs/08-testing.md) | Тест-кейсы и критерии приёмки |
 | [docs/09-build-plan.md](docs/09-build-plan.md) | План сборки, спринты, контент-план |
 | [docs/10-supabase-setup.md](docs/10-supabase-setup.md) | ☁ Подключение облака Supabase: инструкция для новичка, по шагам |
+| [docs/11-deploy.md](docs/11-deploy.md) | 🚀 Публикация в интернет (GitHub Pages): как включить за 5 кликов |
 
 ## Ключевые решения
 
