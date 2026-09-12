@@ -10,22 +10,33 @@ import { Button, Card, Field, Input } from "@/components/ui";
 function CloudCheck() {
   const t = useTranslations("auth");
   const [status, setStatus] = useState<"checking" | "ok" | "fail">("checking");
+  const [detail, setDetail] = useState<string | null>(null);
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) {
       setStatus("fail");
+      setDetail("no-env");
       return;
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-    fetch(`${url}/rest/v1/`, {
-      headers: { apikey: key },
-      signal: controller.signal,
-    })
-      .then((r) => setStatus(r.ok ? "ok" : "fail"))
-      .catch(() => setStatus("fail"))
+    // Лёгкий GET к реальной таблице: корень /rest/v1/ на новых проектах
+    // закрыт для публичных ключей (отдаёт 401/403), поэтому проверяем
+    // именно рабочий эндпоинт. Аноним получит пустой список [] — это 200.
+    fetch(
+      `${url}/rest/v1/quotes?select=id&limit=1&apikey=${encodeURIComponent(key)}`,
+      { signal: controller.signal }
+    )
+      .then((r) => {
+        setStatus(r.ok ? "ok" : "fail");
+        if (!r.ok) setDetail(`HTTP ${r.status}`);
+      })
+      .catch((e) => {
+        setStatus("fail");
+        setDetail(String(e));
+      })
       .finally(() => clearTimeout(timer));
     return () => {
       clearTimeout(timer);
@@ -37,13 +48,14 @@ function CloudCheck() {
     return <p className="mb-4 text-center text-[13px] text-soft">{t("cloudChecking")}</p>;
   }
   return (
-    <p
+    <div
       className={`mb-4 rounded-md px-3.5 py-2.5 text-center text-[13px] ${
         status === "ok" ? "bg-sageBg text-sage" : "bg-clayBg text-clay"
       }`}
     >
       {status === "ok" ? t("cloudOk") : t("cloudFail")}
-    </p>
+      {detail && <span className="mt-1 block opacity-70">({detail})</span>}
+    </div>
   );
 }
 

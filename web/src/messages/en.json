@@ -37,7 +37,7 @@
     "errorDbUser": "The database could not save the user. Make sure the SQL from step 3 of the guide was run in the SQL Editor — and send me this error text.",
     "cloudChecking": "Checking cloud connection…",
     "cloudOk": "☁ Connected to Supabase cloud",
-    "cloudFail": "⚠ No connection to Supabase cloud. Check your internet and reload the page."
+    "cloudFail": "⚠ Could not verify the cloud connection. Try signing up anyway; if it fails — check your internet and reload the page."
   },
   "errors": {
     "sync": "Could not save changes to the cloud. Check your connection and try again."
