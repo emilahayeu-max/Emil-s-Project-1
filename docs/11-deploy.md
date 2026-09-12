@@ -28,6 +28,7 @@
 ## После публикации
 
 - Приложение работает в **облачном режиме**: те же ключи Supabase, что и в предпросмотре. Аккаунты и записи — общие.
+- ⚠️ **Обязательно настройте ссылки в письмах**: по умолчанию Supabase отправляет ссылки на `http://localhost:3000`. На странице **Authentication → URL Configuration** установите Site URL `https://emilahayeu-max.github.io/Emil-s-Project-1` и добавьте в Redirect URLs строку `https://emilahayeu-max.github.io/Emil-s-Project-1/**` (подробнее — шаг 4.5 в docs/10-supabase-setup.md). Без этого письма сброса пароля/подтверждения ведут на неработающий адрес.
 - Если при регистрации появляется «Проверьте почту» — подтвердите письмо от Supabase (папка «Спам»), либо в Supabase → Authentication → Sign In / Providers → Email выключите «Confirm email», и регистрация станет мгновенной.
 - Обновление сайта: `cd web && node scripts/deploy-github-pages.mjs`, затем `git add -A && git commit && git push`. GitHub Pages пересоберёт сайт сам.
 
