@@ -25,7 +25,7 @@
     "signOut": "Sign out",
     "demoNote": "Demo mode: data lives only in this browser. Connect Supabase cloud — see docs/10-supabase-setup.md.",
     "cloudNote": "☁ Cloud mode: data is stored in Supabase and synced across devices.",
-    "checkEmail": "📬 Check your inbox: we sent a confirmation link. After clicking it, come back and sign in.",
+    "checkEmail": "📬 Email sent! Check the Spam folder. If nothing arrives within 10 minutes, disable email confirmation in Supabase (Authentication → Email → “Confirm email”) and just sign in — your account is already created.",
     "errorEmail": "Enter a valid email.",
     "errorPassword": "Password must be at least 6 characters.",
     "errorCredentials": "Wrong email or password — or the account does not exist yet. If this is your first time, click “No account? Sign up” below. If you forgot the password, use “Forgot password?” on the right.",
