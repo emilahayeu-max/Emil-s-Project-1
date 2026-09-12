@@ -79,6 +79,10 @@ const redirectHtml = (to) =>
 writeFileSync(path.join(out, "index.html"), redirectHtml(`${BASE}/ru/login`));
 writeFileSync(path.join(out, "404.html"), redirectHtml(`${BASE}/ru/login`));
 
+// ВАЖНО: .nojekyll отключает обработку Jekyll на GitHub Pages —
+// без него страницы Next.js ломаются (белый экран/500).
+writeFileSync(path.join(out, ".nojekyll"), "");
+
 // Копируем сайт в корень репозитория
 console.log("🚚 Копирую сайт в корень репозитория...");
 cpSync(out, repoRoot, { recursive: true });
