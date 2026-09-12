@@ -33,6 +33,10 @@ export interface DataAdapter {
   signIn(email: string, password: string): Promise<string | null>;
   signUp(name: string, email: string, password: string): Promise<string | null>;
   signOut(): Promise<void>;
+  /** FR-A4: запрос письма для сброса пароля */
+  resetPassword(email: string): Promise<string | null>;
+  /** FR-A4: установка нового пароля после перехода по ссылке из письма */
+  setNewPassword(password: string): Promise<string | null>;
 
   /* данные */
   loadAll(): Promise<LoadedData>;

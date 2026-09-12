@@ -58,6 +58,8 @@ export interface StoreValue {
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (name: string, email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<string | null>;
+  setNewPassword: (password: string) => Promise<string | null>;
   /* настройки */
   setTheme: (theme: Settings["theme"]) => void;
   setSettings: (patch: Partial<Settings>) => void;
@@ -216,6 +218,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await adapter.signOut();
     setState(defaultState);
   }, [adapter]);
+
+  const resetPassword = useCallback(
+    (email: string) => adapter.resetPassword(email),
+    [adapter]
+  );
+
+  const setNewPassword = useCallback(
+    (password: string) => adapter.setNewPassword(password),
+    [adapter]
+  );
 
   const setSettings = useCallback(
     (patch: Partial<Settings>) => {
@@ -466,6 +478,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      resetPassword,
+      setNewPassword,
       setTheme,
       setSettings,
       updateDay,
@@ -492,6 +506,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      resetPassword,
+      setNewPassword,
       setTheme,
       setSettings,
       updateDay,

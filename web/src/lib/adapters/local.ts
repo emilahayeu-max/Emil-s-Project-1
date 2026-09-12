@@ -83,6 +83,15 @@ export const localAdapter: DataAdapter = {
     saveJSON(STORAGE_KEY, st);
   },
 
+  /** Демо-режим: сброс пароля не нужен — просто создайте новый аккаунт */
+  async resetPassword() {
+    return "auth.demoNoReset";
+  },
+
+  async setNewPassword() {
+    return "auth.demoNoReset";
+  },
+
   async loadAll() {
     const st = loadState();
     return {

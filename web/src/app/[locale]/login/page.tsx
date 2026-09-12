@@ -62,7 +62,7 @@ function CloudCheck() {
 export default function LoginPage() {
   const t = useTranslations("auth");
   const router = useRouter();
-  const { signIn, signUp, backend } = useStore();
+  const { signIn, signUp, resetPassword, setNewPassword, backend } = useStore();
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
@@ -71,6 +71,17 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // «Забыли пароль» и «новый пароль» (после ссылки из письма)
+  const [showForgot, setShowForgot] = useState(false);
+  const [recovery, setRecovery] = useState(false);
+
+  // После перехода по ссылке из письма сброса пароля Supabase добавляет
+  // в URL-хэш type=recovery — показываем форму нового пароля (FR-A4)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash.includes("type=recovery")) {
+      setRecovery(true);
+    }
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,12 +106,56 @@ export default function LoginPage() {
         return;
       }
       if (err) {
-        // Известные ошибки переводим, неизвестные показываем как есть (для диагностики)
         setError(t.has(err) ? t(err) : err);
         return;
       }
       router.replace(mode === "signup" ? "/onboarding" : "/");
       router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError(t("errorEmail"));
+      return;
+    }
+    setBusy(true);
+    try {
+      const err = await resetPassword(email);
+      if (err) {
+        setError(t.has(err) ? t(err) : err);
+      } else {
+        setNotice(t("checkResetEmail"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    if (password.length < 6) {
+      setError(t("errorPassword"));
+      return;
+    }
+    setBusy(true);
+    try {
+      const err = await setNewPassword(password);
+      if (err) {
+        setError(t.has(err) ? t(err) : err);
+      } else {
+        setRecovery(false);
+        setMode("signin");
+        setPassword("");
+        setNotice(t("passwordChanged"));
+      }
     } finally {
       setBusy(false);
     }
@@ -117,52 +172,125 @@ export default function LoginPage() {
 
         <Card className="p-6">
           <h2 className="mb-4 font-serif text-2xl font-semibold">
-            {mode === "signin" ? t("signin") : t("signup")}
+            {recovery
+              ? t("newPasswordTitle")
+              : showForgot
+                ? t("forgotTitle")
+                : mode === "signin"
+                  ? t("signin")
+                  : t("signup")}
           </h2>
-          <form onSubmit={submit} className="space-y-3.5">
-            {mode === "signup" && (
-              <Field label={t("name")}>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("namePh")} autoComplete="name" />
+
+          {recovery ? (
+            <form onSubmit={submitNewPassword} className="space-y-3.5">
+              <Field label={t("newPassword")}>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  required
+                />
               </Field>
-            )}
-            <Field label={t("email")}>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                required
-              />
-            </Field>
-            <Field label={t("password")}>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                required
-              />
-            </Field>
-            {error && (
-              <div className="rounded-md border border-clay bg-clayBg px-3.5 py-2.5 text-sm text-clay">
-                {error}
+              {error && (
+                <div className="rounded-md border border-clay bg-clayBg px-3.5 py-2.5 text-sm text-clay">
+                  {error}
+                </div>
+              )}
+              {notice && (
+                <p className="rounded-md bg-sageBg px-3.5 py-2.5 text-sm text-sage">{notice}</p>
+              )}
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy ? "…" : t("saveNewPassword")}
+              </Button>
+            </form>
+          ) : showForgot ? (
+            <form onSubmit={submitForgot} className="space-y-3.5">
+              <p className="text-sm text-soft">{t("forgotHint")}</p>
+              <Field label={t("email")}>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  required
+                />
+              </Field>
+              {error && (
+                <div className="rounded-md border border-clay bg-clayBg px-3.5 py-2.5 text-sm text-clay">
+                  {error}
+                </div>
+              )}
+              {notice && (
+                <p className="rounded-md bg-sageBg px-3.5 py-2.5 text-sm text-sage">{notice}</p>
+              )}
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy ? "…" : t("sendReset")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setShowForgot(false)}
+              >
+                {t("back")}
+              </Button>
+            </form>
+          ) : (
+            <>
+              <form onSubmit={submit} className="space-y-3.5">
+                {mode === "signup" && (
+                  <Field label={t("name")}>
+                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("namePh")} autoComplete="name" />
+                  </Field>
+                )}
+                <Field label={t("email")}>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    required
+                  />
+                </Field>
+                <Field label={t("password")}>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                    required
+                  />
+                </Field>
+                {error && (
+                  <div className="rounded-md border border-clay bg-clayBg px-3.5 py-2.5 text-sm text-clay">
+                    {error}
+                  </div>
+                )}
+                {notice && (
+                  <p className="rounded-md bg-sageBg px-3.5 py-2.5 text-sm text-sage">{notice}</p>
+                )}
+                <Button type="submit" className="w-full" disabled={busy}>
+                  {busy ? "…" : mode === "signin" ? t("signin") : t("signup")}
+                </Button>
+              </form>
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <button className="text-accent" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}>
+                  {mode === "signin" ? t("switchToSignup") : t("switchToSignin")}
+                </button>
+                <button
+                  className="text-soft underline-offset-2 hover:underline"
+                  onClick={() => setShowForgot(true)}
+                >
+                  {t("forgot")}
+                </button>
               </div>
-            )}
-            {notice && (
-              <p className="rounded-md bg-sageBg px-3.5 py-2.5 text-sm text-sage">{notice}</p>
-            )}
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "…" : mode === "signin" ? t("signin") : t("signup")}
-            </Button>
-          </form>
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <button className="text-accent" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}>
-              {mode === "signin" ? t("switchToSignup") : t("switchToSignin")}
-            </button>
-            <span className="text-soft">{t("forgot")}</span>
-          </div>
+            </>
+          )}
         </Card>
 
         <p className="mt-5 text-center text-[13px] leading-relaxed text-soft">

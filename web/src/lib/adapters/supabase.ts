@@ -150,6 +150,33 @@ export const supabaseAdapter: DataAdapter = {
     await sb.auth.signOut();
   },
 
+  /** FR-A4: письмо со ссылкой сброса пароля; ссылка ведёт на /ru/login */
+  async resetPassword(email) {
+    const sb = getClient();
+    if (!sb) return "auth.errorGeneric";
+    const base = process.env.NEXT_PUBLIC_BASE_PATH || "";
+    const redirectTo = `${window.location.origin}${base}/ru/login`;
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) {
+      console.error("supabase resetPassword:", error.message);
+      if (/rate limit/i.test(error.message)) return "auth.errorRateLimit";
+      return error.message;
+    }
+    return null;
+  },
+
+  /** FR-A4: новый пароль после перехода по ссылке восстановления */
+  async setNewPassword(password) {
+    const sb = getClient();
+    if (!sb) return "auth.errorGeneric";
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) {
+      console.error("supabase setNewPassword:", error.message);
+      return error.message;
+    }
+    return null;
+  },
+
   async loadAll() {
     const sb = getClient();
     if (!sb) throw new Error("supabase: клиент не настроен");
